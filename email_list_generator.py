@@ -1,7 +1,15 @@
+'''
+Notice: Currently this will generate around 36,205,000 possible emails if all flags are enabled
+'''
 import os, sys
 
 STORAGE_PATH = f"{os.path.realpath(os.path.dirname(__file__))}/emails/"
 GENERATED_FILE = f"{STORAGE_PATH}generated_emails.txt"
+CHUNK_SIZE = 20000
+USE_DEFAULT_HOSTS = True
+USER_HOSTS = ""
+INCLUDE_YEARS = False
+INCLUDE_NUMBERS = False
 
 def get_names():
     first_names = ["james", "robert", "michael", "david", "william", "richard", 
@@ -45,38 +53,51 @@ def get_names():
     return [(a, b) for a in first_names for b in last_names]
 
 def add_arbitrary_numbers(name_pair):
-    possible_combinations = [f"{name_pair[0]}{name_pair[1]}"]
+    possible_combinations = [f"{name_pair[0]}{name_pair[1]}", f"{name_pair[0]}.{name_pair[1]}"]
 
-    #cover smaller numbers like sports numbers and abbreviated years
-    for i in range(0,100):
-        possible_combinations.append(f"{name_pair[0]}.{name_pair[1]}{i}")
-        possible_combinations.append(f"{name_pair[0]}{name_pair[1]}{i}")
+    if INCLUDE_NUMBERS:
+        #cover smaller numbers like sports numbers and abbreviated years
+        for i in range(0,100):
+            possible_combinations.append(f"{name_pair[0]}.{name_pair[1]}{i}")
+            possible_combinations.append(f"{name_pair[0]}{name_pair[1]}{i}")
     
-    #cover from 1950-2050 for birth years and grad years
-    for i in range(1950, 2050):
-        possible_combinations.append(f"{name_pair[0]}.{name_pair[1]}{i}")
-        possible_combinations.append(f"{name_pair[0]}{name_pair[1]}{i}")
+    if INCLUDE_YEARS:
+        #cover from 1950-2050 for birth years and grad years
+        for i in range(1950, 2050):
+            possible_combinations.append(f"{name_pair[0]}.{name_pair[1]}{i}")
+            possible_combinations.append(f"{name_pair[0]}{name_pair[1]}{i}")
 
     return possible_combinations
 
+def write_file(data, chunk_count):
+    filename = f"{STORAGE_PATH}email_list_{chunk_count}.txt"
+    try:
+        with open(filename, "w") as nf:
+            nf.writelines(data)
+    except:
+        print("There was a problem writing to the file")
+
 def disperse_emails():
-    file_count = 1
+    chunk_count = 1
     line_count = 0
+
     if os.path.exists(GENERATED_FILE):
         with open(GENERATED_FILE, "r") as f:
+            buffered_string = ""
             for line in f.readlines():
-                if line_count < 20001:
-                    with open(f"{STORAGE_PATH}email_list_{file_count}.txt", "a") as nf:
-                        nf.write(line)
+                if line_count < int(CHUNK_SIZE):
+                    buffered_string += line
                     line_count += 1
                 else:
+                    write_file(buffered_string, chunk_count)
+                    buffered_string = ""
                     line_count = 0
-                    file_count += 1
+                    chunk_count += 1
     else:
         print("Email list file not found. Please use -g flag to generate a new one.")
 
-def main():
-    email_hosts = ["gmail.com", "outlook.com", "hotmail.com"]
+def generate_email_list():
+    default_email_hosts = ["gmail.com", "outlook.com", "hotmail.com"]
     all_possible_names = get_names()
 
     if not os.path.exists(STORAGE_PATH):
@@ -86,14 +107,54 @@ def main():
         for names in all_possible_names:
             bastardized_names = add_arbitrary_numbers(names)
             for name in bastardized_names:
-                for host in email_hosts:
-                    f.write(f"{name}@{host}\n")
+                if USE_DEFAULT_HOSTS:
+                    for host in default_email_hosts:
+                        f.write(f"{name}@{host}\n")
+                else:
+                    hosts = USER_HOSTS.split(',')
+                    for host in hosts:
+                        f.write(f"{name}@{host}\n")
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        if sys.argv[1] == "-h":
-            print("-h for help\n-g to generate")
-        elif sys.argv[1] == "-g":
-            main()
-    else:
+        help_flag = "-h"
+        host_flag = "-d"
+        generate_flag = "-g"
+        size_flag = "-s"
+        years_flag = "-y"
+        numbers_flag = "-n"
+
+        help_messages = [
+            f"{help_flag} for help",
+            f"{generate_flag} to generate a new bulk list",
+            f"{size_flag} to set chunk size DEFAULT:20000",
+            f"{host_flag} to enter a cvs list of desired email hosts DEFAULT: gmail.com, hotmail.com, outlook.com",
+            f"{numbers_flag} to include numbers 0-100 to cover common sports numbers and year abbreviations that may are likely to be included in email",
+            f"{years_flag} to include years 1950-2050 for common graduation/birth years in email"
+        ]
+        
+        if help_flag in sys.argv:
+            for msg in help_messages:
+                print(msg)
+
+        if host_flag in sys.argv:
+            if not generate_flag in sys.argv:
+                print(f"You must use the {generate_flag} flag to use the {host_flag} flag")
+                exit()
+
+            USE_DEFAULT_HOSTS = False
+            USER_HOSTS = sys.argv[sys.argv.index(host_flag) + 1]
+        
+        if size_flag in sys.argv:
+            CHUNK_SIZE = sys.argv[sys.argv.index(size_flag) + 1]
+
+        if numbers_flag in sys.argv:
+            INCLUDE_NUMBERS = True
+
+        if years_flag in sys.argv:
+            INCLUDE_YEARS = True
+
+        if generate_flag in sys.argv:
+            generate_email_list()
+    
         disperse_emails()
