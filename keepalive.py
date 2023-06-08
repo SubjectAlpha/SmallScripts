@@ -2,7 +2,7 @@
 Actively track user input (once/second to limit performance impact) and simulate keypress after 2 minutes of inactivity.
 After simulation the script will pause for one minute waiting for user input before continuing this behavior until input is observed (once/minute).
 '''
-import time, sys
+import time
 from pynput import mouse, keyboard
 from datetime import datetime, timedelta
 
